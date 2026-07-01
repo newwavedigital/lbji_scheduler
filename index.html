@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Spine Scheduler — Prototype</title>
+<style>
+  :root {
+    --bg: #f5f7fb; --card: #ffffff; --ink: #0f172a; --muted: #64748b;
+    --accent: #2563eb; --accent-soft: #dbeafe;
+    --success: #059669; --warn: #d97706; --danger: #dc2626;
+    --border: #e2e8f0; --shadow: 0 1px 3px rgba(15,23,42,0.06), 0 8px 24px rgba(15,23,42,0.06);
+    --loc-franciscan: #2563eb; --loc-surgicare: #d97706;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--ink); line-height: 1.5;
+    display: flex; min-height: 100vh;
+  }
+  aside { width: 230px; background: #0f172a; color: white; padding: 22px 0; display: flex; flex-direction: column; flex-shrink: 0; }
+  aside .brand { padding: 0 22px 22px; border-bottom: 1px solid #1e293b; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+  aside .brand .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+  aside .brand small { color: #64748b; font-size: 11px; font-weight: 400; display: block; }
+  aside nav { padding: 14px 0; flex: 1; }
+  aside nav a { display: flex; align-items: center; gap: 12px; padding: 11px 22px; color: #cbd5e1; text-decoration: none; font-size: 14px; cursor: pointer; border-left: 3px solid transparent; }
+  aside nav a:hover { background: #1e293b; color: white; }
+  aside nav a.active { background: #1e293b; color: white; border-left-color: var(--accent); }
+  aside nav a svg { width: 18px; height: 18px; flex-shrink: 0; }
+  aside .footer { padding: 16px 22px; border-top: 1px solid #1e293b; font-size: 11px; color: #64748b; }
+
+  main { flex: 1; padding: 28px 36px; overflow-x: hidden; }
+  .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; gap: 12px; }
+  .page-header h1 { font-size: 22px; margin: 0; font-weight: 600; }
+  .page-header .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); padding: 22px; }
+  .card h2 { font-size: 14px; margin: 0 0 16px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+
+  .submission-grid { display: grid; grid-template-columns: 440px 1fr; gap: 24px; }
+  @media (max-width: 1100px) { .submission-grid { grid-template-columns: 1fr; } }
+
+  label { display: block; font-size: 11px; font-weight: 600; color: var(--muted); margin: 14px 0 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+  input, select, textarea { width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; font-family: inherit; background: white; color: var(--ink); }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .pill-group { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .pill { border: 1px solid var(--border); background: white; padding: 6px 12px; border-radius: 999px; font-size: 13px; cursor: pointer; user-select: none; }
+  .pill.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+  button.primary { margin-top: 22px; width: 100%; background: var(--accent); color: white; padding: 12px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  button.primary:hover { background: #1d4ed8; }
+  button.secondary { width: 100%; background: white; color: var(--muted); padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; cursor: pointer; margin-top: 8px; font-family: inherit; }
+  button.confirm { margin-top: 18px; width: 100%; background: var(--success); color: white; padding: 12px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  button.confirm:hover { background: #047857; }
+
+  .empty { color: var(--muted); text-align: center; padding: 80px 20px; font-size: 14px; }
+  .recommendation { border: 2px solid var(--accent); background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%); border-radius: 12px; padding: 24px; }
+  .result-headline { text-align: center; padding: 6px 0 18px; border-bottom: 1px solid var(--border); margin-bottom: 18px; }
+  .loc-tag-lg { display: inline-block; padding: 8px 22px; border-radius: 999px; color: white; font-size: 18px; font-weight: 600; letter-spacing: 0.02em; }
+  .result-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 18px; }
+  .result-grid .ritem { text-align: center; background: white; border: 1px solid var(--border); border-radius: 10px; padding: 12px 8px; }
+  .result-grid .ritem .label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; margin-bottom: 4px; }
+  .result-grid .ritem .value { font-size: 15px; font-weight: 600; color: var(--ink); }
+  .result-meta { background: white; border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; font-size: 13px; line-height: 1.7; }
+  .result-meta strong { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; margin-right: 8px; }
+
+  .cal-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; }
+  .cal-controls .week-nav { display: flex; align-items: center; gap: 10px; }
+  .cal-controls button { background: white; border: 1px solid var(--border); padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit; }
+  .cal-controls .week-label { font-weight: 600; font-size: 14px; }
+
+  .calendar { background: white; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; display: grid; grid-template-columns: 70px repeat(5, 1fr); }
+  .loc-cal-wrap { margin-bottom: 22px; }
+  .loc-cal-wrap:last-child { margin-bottom: 0; }
+  .loc-cal-header { color: white; font-weight: 600; font-size: 14px; padding: 10px 16px; border-radius: 12px 12px 0 0; display: flex; align-items: center; gap: 10px; }
+  .loc-cal-header .count { background: rgba(255,255,255,0.25); padding: 2px 9px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+  .loc-cal-wrap .calendar { border-top-left-radius: 0; border-top-right-radius: 0; }
+
+  .cal-cell { border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); min-height: 40px; position: relative; }
+  .cal-cell.day-fri { border-right: none; }
+  .cal-head { background: #f8fafc; text-align: center; padding: 10px 6px; font-weight: 600; font-size: 13px; border-bottom: 1px solid var(--border); }
+  .cal-head .date { display: block; color: var(--muted); font-size: 11px; font-weight: 500; }
+  .cal-head.today { background: var(--accent-soft); color: var(--accent); }
+  .cal-time { padding: 6px 8px; font-size: 11px; color: var(--muted); text-align: right; background: #f8fafc; font-weight: 500; }
+  .appt { position: absolute; left: 4px; right: 4px; border-radius: 5px; padding: 4px 7px; color: white; font-size: 11px; line-height: 1.25; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.15); cursor: pointer; z-index: 2; min-height: 22px; transition: transform 0.1s, box-shadow 0.1s; }
+  .appt:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(0,0,0,0.25); z-index: 3; }
+  .appt .pt   { display: block; font-weight: 600; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .appt .proc { display: block; font-size: 10px; opacity: 0.95; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .appt .doc  { display: block; font-size: 10px; opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+  .modal-overlay.show { opacity: 1; pointer-events: auto; }
+  .modal { background: white; border-radius: 14px; max-width: 520px; width: 92%; padding: 26px 28px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); position: relative; transform: translateY(10px); transition: transform 0.2s; max-height: 88vh; overflow-y: auto; }
+  .modal-overlay.show .modal { transform: translateY(0); }
+  .modal .close { position: absolute; top: 12px; right: 12px; background: none; border: none; font-size: 22px; color: var(--muted); cursor: pointer; width: 30px; height: 30px; border-radius: 50%; line-height: 1; }
+  .modal .close:hover { background: #f1f5f9; color: var(--ink); }
+  .modal h3 { margin: 0 0 16px; font-size: 16px; font-weight: 600; }
+  .modal .drow { display: grid; grid-template-columns: 100px 1fr; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .modal .drow:last-child { border-bottom: none; }
+  .modal .drow .l { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; padding-top: 3px; }
+  .modal .drow .v { color: var(--ink); }
+  .modal .loc-tag { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 10px; color: white; font-size: 11px; font-weight: 500; }
+
+  .check-list { max-height: 180px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; background: #f8fafc; }
+  .check-list label { display: flex; align-items: center; gap: 8px; margin: 0; padding: 5px 0; font-size: 13px; font-weight: normal; color: var(--ink); text-transform: none; letter-spacing: normal; }
+  .check-list input[type="checkbox"] { width: auto; margin: 0; cursor: pointer; }
+
+  .section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 20px 0 8px; }
+  .day-row-edit { display: grid; grid-template-columns: 26px 50px 1fr 12px 1fr; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .day-row-edit:last-child { border-bottom: none; }
+  .day-row-edit .day-name { font-size: 13px; font-weight: 600; }
+  .day-row-edit input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+  .day-row-edit input[type="time"] { padding: 6px 8px; font-size: 13px; width: 100%; }
+  .day-row-edit.off input[type="time"] { opacity: 0.4; }
+  .day-row-edit .dash { text-align: center; color: var(--muted); }
+  .time-off-list { margin-bottom: 6px; }
+  .time-off-item { display: flex; justify-content: space-between; align-items: center; padding: 9px 12px; background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; font-size: 13px; }
+  .time-off-item .remove-btn { background: none; border: none; color: var(--muted); font-size: 18px; cursor: pointer; width: 26px; height: 26px; border-radius: 50%; line-height: 1; }
+  .time-off-item .remove-btn:hover { background: #fee2e2; color: var(--danger); }
+  .time-off-form { padding: 14px 14px 12px; background: #f8fafc; border: 1px dashed var(--border); border-radius: 8px; margin-top: 8px; }
+  button.add-btn { background: white; border: 1px solid var(--accent); color: var(--accent); padding: 9px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; width: 100%; font-weight: 500; margin-top: 8px; font-family: inherit; }
+  button.add-btn:hover { background: var(--accent-soft); }
+  button.manage-btn { background: white; border: 1px solid var(--border); color: var(--ink); padding: 7px 14px; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 500; font-family: inherit; white-space: nowrap; }
+  button.manage-btn:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  button.danger-btn { background: white; border: 1px solid var(--danger); color: var(--danger); padding: 10px; border-radius: 8px; font-size: 13px; cursor: pointer; width: 100%; font-weight: 500; margin-top: 8px; font-family: inherit; }
+  button.danger-btn:hover { background: #fee2e2; }
+  .timeoff-tag { display: inline-block; background: #fef3c7; color: var(--warn); padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 600; margin-top: 6px; }
+  .day-row.off { opacity: 0.35; text-decoration: line-through; }
+
+  table { width: 100%; border-collapse: collapse; background: white; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  table th { background: #f8fafc; padding: 11px 14px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); border-bottom: 1px solid var(--border); }
+  table td { padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: top; }
+  table tr:last-child td { border-bottom: none; }
+  table tr:hover td { background: #f8fafc; }
+  .badge-pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+  .badge-pill.surg { background: #fee2e2; color: var(--danger); }
+  .badge-pill.inj  { background: #dbeafe; color: var(--accent); }
+  .badge-pill.both { background: #ede9fe; color: #7c3aed; }
+  .loc-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  .proc-tag { display: inline-block; background: #f1f5f9; color: var(--ink); padding: 2px 8px; border-radius: 6px; font-size: 11px; margin: 2px 3px 2px 0; font-weight: 500; }
+  .add-row-btn { background: var(--accent); color: white; border: none; padding: 9px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; font-weight: 600; font-family: inherit; }
+  .add-row-btn:hover { background: #1d4ed8; }
+
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--success); color: white; padding: 12px 18px; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); font-size: 14px; font-weight: 500; transform: translateY(80px); opacity: 0; transition: transform 0.25s, opacity 0.25s; z-index: 100; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+</style>
+</head>
+<body>
+
+<aside>
+  <div class="brand">
+    <span class="dot"></span>
+    <div>Spine Scheduler<small>Lakeshore Bone &amp; Joint</small></div>
+  </div>
+  <nav>
+    <a data-page="submission" class="active" onclick="goto('submission')">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg>
+      New Submission
+    </a>
+    <a data-page="schedule" onclick="goto('schedule')">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+      Schedule
+    </a>
+    <a data-page="patients" onclick="goto('patients')">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+      Patients
+    </a>
+    <a data-page="procedures" onclick="goto('procedures')">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+      Procedures
+    </a>
+    <a data-page="doctors" onclick="goto('doctors')">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0016.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 002 8.5c0 2.29 1.51 4.04 3 5.5l7 7 7-7z"/></svg>
+      Doctors
+    </a>
+  </nav>
+  <div class="footer">Prototype · v0.7</div>
+</aside>
+
+<main>
+
+  <section id="page-submission" class="page active">
+    <div class="page-header">
+      <div>
+        <h1>New Submission</h1>
+        <div class="sub">Pick a doctor, fill in procedure + patient details. Location is determined by the patient's insurance.</div>
+      </div>
+    </div>
+    <div class="submission-grid">
+      <div class="card">
+        <h2>Patient &amp; Procedure</h2>
+
+        <label>Doctor</label>
+        <select id="doctorSelect" onchange="updateProcedureOptions()"></select>
+
+        <label>Procedure</label>
+        <select id="procedureSelect"></select>
+
+        <label>Preferred Surgery Date</label>
+        <input id="preferredDate" type="date" />
+
+        <div class="row">
+          <div><label>First Name</label><input id="firstName" type="text" /></div>
+          <div><label>Last Name</label><input id="lastName" type="text" /></div>
+        </div>
+
+        <label>Date of Birth</label>
+        <input id="dob" type="date" />
+
+        <label>Insurance</label>
+        <select id="insurance">
+          <option value="">— Select Insurance —</option>
+          <option>Aetna</option><option>Aetna Medicare</option>
+          <option>Anthem</option><option>Anthem Medicare</option>
+          <option>Cigna</option>
+          <option>United Healthcare</option><option>United Healthcare Medicare</option>
+          <option>Work Comp</option>
+          <option>Medicare</option><option>Medicade</option>
+          <option>Humana</option><option>Self-Pay</option>
+        </select>
+
+        <label>Inpatient vs Outpatient</label>
+        <div class="pill-group" id="setting">
+          <div class="pill active" data-val="outpatient">Outpatient</div>
+          <div class="pill" data-val="inpatient">Inpatient</div>
+        </div>
+
+        <label>Room Flip</label>
+        <div class="pill-group" id="roomFlip">
+          <div class="pill active" data-val="no">No</div>
+          <div class="pill" data-val="yes">Yes</div>
+        </div>
+
+        <label>Notes (optional)</label>
+        <textarea id="notes" rows="2" placeholder="Failed conservative treatment, MRI confirms..."></textarea>
+
+        <button class="primary" onclick="runMatch()">Schedule</button>
+        <button class="secondary" onclick="resetForm()">Clear Form</button>
+      </div>
+
+      <div class="card">
+        <h2>Recommended Scheduling</h2>
+        <div id="results">
+          <div class="empty">Pick a doctor and procedure, then click <strong>Schedule</strong> to see the recommended location, date, and time.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="page-schedule" class="page">
+    <div class="page-header">
+      <div>
+        <h1>Schedule</h1>
+        <div class="sub">Confirmed appointments per location. Click any block to edit or cancel.</div>
+      </div>
+      <button class="add-row-btn" onclick="openAppointmentEditor(null)">+ New Entry</button>
+    </div>
+    <div class="cal-controls">
+      <div class="week-nav">
+        <button onclick="shiftWeek(-1)">‹ Prev</button>
+        <span class="week-label" id="weekLabel"></span>
+        <button onclick="shiftWeek(1)">Next ›</button>
+        <button onclick="goToThisWeek()">Today</button>
+      </div>
+    </div>
+    <div class="loc-cal-wrap">
+      <div class="loc-cal-header" style="background:var(--loc-surgicare)">
+        Surgicare <span class="count" id="count-Surgicare"></span>
+      </div>
+      <div class="calendar" id="calendar-Surgicare"></div>
+    </div>
+    <div class="loc-cal-wrap">
+      <div class="loc-cal-header" style="background:var(--loc-franciscan)">
+        Franciscan <span class="count" id="count-Franciscan"></span>
+      </div>
+      <div class="calendar" id="calendar-Franciscan"></div>
+    </div>
+  </section>
+
+  <section id="page-patients" class="page">
+    <div class="page-header">
+      <div>
+        <h1>Patients</h1>
+        <div class="sub">Auto-populated when a submission is confirmed. <span id="patientCount"></span></div>
+      </div>
+    </div>
+    <div id="patientsContainer"></div>
+  </section>
+
+  <section id="page-procedures" class="page">
+    <div class="page-header">
+      <div>
+        <h1>Procedures</h1>
+        <div class="sub">Add, edit, or remove procedures and the doctors who perform them.</div>
+      </div>
+      <button class="add-row-btn" onclick="openProcedureModal(null)">+ Add Procedure</button>
+    </div>
+    <div id="proceduresContainer"></div>
+  </section>
+
+  <section id="page-doctors" class="page">
+    <div class="page-header">
+      <div>
+        <h1>Doctors</h1>
+        <div class="sub">24 active physicians · hours mirror what's available on New Submission.</div>
+      </div>
+    </div>
+    <div id="doctorsContainer"></div>
+  </section>
+
+</main>
+
+<div id="modalOverlay" class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <button class="close" onclick="closeModal()" aria-label="Close">×</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+<div id="toast" class="toast"></div>
+
+<script>
+const LOCATIONS = ["Franciscan", "Surgicare"];
+const LOC_COLOR = { "Franciscan": "var(--loc-franciscan)", "Surgicare": "var(--loc-surgicare)" };
+const INSURANCE_TO_LOC = {
+  "Aetna": ["Franciscan"], "Aetna Medicare": ["Franciscan"],
+  "Anthem": ["Surgicare"], "Anthem Medicare": ["Franciscan"],
+  "Cigna": ["Franciscan"],
+  "United Healthcare": ["Surgicare"], "United Healthcare Medicare": ["Franciscan"],
+  "Work Comp": ["Franciscan", "Surgicare"],
+  "Medicare": ["Franciscan"], "Medicade": ["Franciscan"],
+  "Humana": ["Franciscan"], "Self-Pay": ["Franciscan"]
+};
+const INSURANCES = Object.keys(INSURANCE_TO_LOC);
+const DAY_START = 7.0;
+const DAY_END   = 15.5;
+
+function defaultSchedule(){
+  return {
+    Mon:{start:7.0,end:15.5}, Tue:{start:7.0,end:15.5}, Wed:{start:7.0,end:15.5},
+    Thu:{start:7.0,end:15.5}, Fri:{start:7.0,end:15.5}
+  };
+}
+
+const DOCTORS = [
+  { id: 1,  name: "Dr. Aaron G. Anderson, MD",       title: "Practice President · Fellowship-Trained", type: "surgery",   settings: ["outpatient","inpatient"], phone: "(219) 921-1444", email: "a.anderson@lbji.com" },
+  { id: 2,  name: "Dr. Rebecca B. Anderson, MD",     title: "Fellowship-Trained", type: "surgery",   settings: ["outpatient","inpatient"], phone: "(219) 921-1444", email: "r.anderson@lbji.com" },
+  { id: 3,  name: "Dr. Justin P. Colanese, MD",      title: "Fellowship-Trained", type: "surgery",   settings: ["outpatient","inpatient"], phone: "(219) 921-1444", email: "j.colanese@lbji.com" },
+  { id: 4,  name: "Dr. Brian T. Damitz, DPM",        title: "",                   type: "surgery",   settings: ["outpatient"],             phone: "(219) 921-1444", email: "b.damitz@lbji.com" },
+  { id: 5,  name: "Dr. John A. Guzzo, MD",           title: "Subspecialty Cert. · Orthopedic Sports Medicine", type: "surgery", settings: ["outpatient","inpatient"], phone: "(219) 921-1444", email: "j.guzzo@lbji.com" },
+  { id: 6,  name: "Dr. Jonathan G. Hobbs, MD",       title: "Fellowship-Trained", type: "surgery",   settings: ["inpatient","outpatient"], phone: "(219) 921-1444", email: "j.hobbs@lbji.com" },
+  { id: 7,  name: "Dr. Neel P. Jain, MD",            title: "Fellowship-Trained", type: "surgery",   settings: ["outpatient","inpatient"], phone: "(219) 921-1444", email: "n.jain@lbji.com" },
+  { id: 8,  name: "Dr. Steven M. Kalisch, PhD, HSPP",title: "",                   type: "other",     settings: ["outpatient"],             phone: "(219) 921-1444", email: "s.kalisch@lbji.com" },
+  { id: 9,  name: "Dr. Thomas H. Kay, MD",           title: "",                   type: "surgery",   settings: ["outpatient","inpatient"], phone: "(219) 921-1444", email: "t.kay@lbji.com" },
+  { id: 10, name: "Dr. Akshay Lakra, MD",            title: "Fellowship-Trained", type: "surgery",   settings: ["outpatient","inpatient"], phone: "(219) 921-1444", email: "a.lakra@lbji.com" },
+  { id: 11, name: "Dr. Anthony C. Levenda, MD",      title: "Fellowship-Trained", type: "surgery",   settings: ["outpatient","inpatient"], phone: "(219) 921-1444", email: "a.levenda@lbji.com" },
+  { id: 12, name: "Dr. Daniel D. Li, MD",            title: "Fellowship-Trained", type: "surgery",   settings: ["outpatient","inpatient"], phone: "(219) 921-1444", email: "d.li@lbji.com" },
+  { id: 13, name: "Dr. Daniela Matijevich, DPM, MS", title: "",                   type: "surgery",   settings: ["outpatient"],             phone: "(219) 921-1444", email: "d.matijevich@lbji.com" },
+  { id: 14, name: "Dr. Tyler C. Miller, MD",         title: "Fellowship-Trained", type: "surgery",   settings: ["outpatient","inpatient"], phone: "(219) 921-1444", email: "t.miller@lbji.com" },
+  { id: 15, name: "Dr. Heather A. Nath, MD",         title: "Fellowship-Trained", type: "injection", settings: ["outpatient"],             phone: "(219) 921-1444", email: "h.nath@lbji.com" },
+  { id: 16, name: "Dr. Nick Nenadovich, MD",         title: "Fellowship-Trained", type: "surgery",   settings: ["inpatient","outpatient"], phone: "(219) 921-1444", email: "n.nenadovich@lbji.com" },
+  { id: 17, name: "Dr. Ryan J. Plank, MD",           title: "Subspecialty Cert. · Orthopedic Sports Medicine", type: "surgery", settings: ["outpatient","inpatient"], phone: "(219) 921-1444", email: "r.plank@lbji.com" },
+  { id: 18, name: "Dr. Anita K. Rao, MD",            title: "Fellowship-Trained", type: "injection", settings: ["outpatient"],             phone: "(219) 921-1444", email: "a.rao@lbji.com" },
+  { id: 19, name: "Dr. Aaron K. Ruter, DPM",         title: "Fellowship-Trained", type: "surgery",   settings: ["outpatient","inpatient"], phone: "(219) 921-1444", email: "a.ruter@lbji.com" },
+  { id: 20, name: "Dr. Adrian Sonevytsky, MD",       title: "Fellowship-Trained", type: "injection", settings: ["outpatient"],             phone: "(219) 921-1444", email: "a.sonevytsky@lbji.com" },
+  { id: 21, name: "Dr. Eric K. Szczesniak, MD",      title: "Fellowship-Trained", type: "surgery",   settings: ["outpatient","inpatient"], phone: "(219) 921-1444", email: "e.szczesniak@lbji.com" },
+  { id: 22, name: "Dr. Anton A. Thompkins, MD",      title: "Fellowship-Trained", type: "surgery",   settings: ["inpatient","outpatient"], phone: "(219) 921-1444", email: "a.thompkins@lbji.com" },
+  { id: 23, name: "Dr. Dwight S. Tyndall, MD",       title: "Fellowship-Trained", type: "surgery",   settings: ["inpatient","outpatient"], phone: "(219) 921-1444", email: "d.tyndall@lbji.com" },
+  { id: 24, name: "Dr. Hassan Usmani, DPM",          title: "",                   type: "surgery",   settings: ["outpatient"],             phone: "(219) 921-1444", email: "h.usmani@lbji.com" }
+];
+DOCTORS.forEach(d => { d.schedule = defaultSchedule(); d.enabledDays = new Set(Object.keys(d.schedule)); d.timeOff = []; });
+
+let nextProcId = 1;
+const PROCEDURES = [
+  { id: nextProcId++, name: "Microdiscectomy",             kind: "OR",     duration: 90,  doctorIds: [6,16,22,23] },
+  { id: nextProcId++, name: "Laminectomy",                 kind: "OR",     duration: 120, doctorIds: [6,16,22,23] },
+  { id: nextProcId++, name: "Spinal Fusion (1-level)",     kind: "OR",     duration: 180, doctorIds: [6,16,22,23] },
+  { id: nextProcId++, name: "Spinal Fusion (multi-level)", kind: "OR",     duration: 240, doctorIds: [6,16,23] },
+  { id: nextProcId++, name: "Disc Replacement",            kind: "OR",     duration: 180, doctorIds: [6,22,23] },
+  { id: nextProcId++, name: "Kyphoplasty",                 kind: "OR",     duration: 60,  doctorIds: [16] },
+  { id: nextProcId++, name: "Epidural Steroid Injection",  kind: "clinic", duration: 30,  doctorIds: [15,18,20] },
+  { id: nextProcId++, name: "Facet Joint Injection",       kind: "clinic", duration: 30,  doctorIds: [15,18,20] },
+  { id: nextProcId++, name: "SI Joint Injection",          kind: "clinic", duration: 30,  doctorIds: [15,18,20] },
+  { id: nextProcId++, name: "Radiofrequency Ablation",     kind: "clinic", duration: 45,  doctorIds: [15,20] },
+  { id: nextProcId++, name: "Medial Branch Block",         kind: "clinic", duration: 30,  doctorIds: [15,18,20] },
+  { id: nextProcId++, name: "Total Hip Replacement",       kind: "OR",     duration: 180, doctorIds: [10,12,21] },
+  { id: nextProcId++, name: "Total Knee Replacement",      kind: "OR",     duration: 150, doctorIds: [7,10,11,12,21] },
+  { id: nextProcId++, name: "Shoulder Replacement",        kind: "OR",     duration: 150, doctorIds: [1,11] },
+  { id: nextProcId++, name: "Knee Arthroscopy",            kind: "OR",     duration: 60,  doctorIds: [5,7,11,17] },
+  { id: nextProcId++, name: "Shoulder Arthroscopy",        kind: "OR",     duration: 90,  doctorIds: [1,2,5,11,14,17] },
+  { id: nextProcId++, name: "Rotator Cuff Repair",         kind: "OR",     duration: 90,  doctorIds: [1,2,5,11] },
+  { id: nextProcId++, name: "ACL Reconstruction",          kind: "OR",     duration: 120, doctorIds: [5,7,11,17] },
+  { id: nextProcId++, name: "Carpal Tunnel Release",       kind: "OR",     duration: 30,  doctorIds: [1,2,14] },
+  { id: nextProcId++, name: "Trigger Finger Release",      kind: "OR",     duration: 30,  doctorIds: [1,2,14] },
+  { id: nextProcId++, name: "Bunion Surgery",              kind: "OR",     duration: 60,  doctorIds: [4,13,19,24] },
+  { id: nextProcId++, name: "Total Ankle Replacement",     kind: "OR",     duration: 120, doctorIds: [19,24] },
+  { id: nextProcId++, name: "Foot/Ankle Reconstruction",   kind: "OR",     duration: 120, doctorIds: [3,19,24] },
+  { id: nextProcId++, name: "Pre-Op Psych Eval",           kind: "clinic", duration: 60,  doctorIds: [8] },
+  { id: nextProcId++, name: "General Ortho Consult",       kind: "clinic", duration: 30,  doctorIds: [3,9] }
+];
+
+let PATIENTS = [];
+let APPOINTMENTS = [];
+let pendingMatch = null;
+let currentWeekStart = mondayOf(new Date());
+
+seedSampleAppointments();
+
+function seedSampleAppointments(){
+  const monday = mondayOf(new Date());
+  const samples = [
+    { day: 0, hour: 7,    doctorId: 6,  procLabel: "Laminectomy",                patient: "R. Stevens",  duration: 120, location: "Franciscan", insurance: "Medicare" },
+    { day: 0, hour: 9,    doctorId: 6,  procLabel: "Microdiscectomy",            patient: "M. Klein",    duration: 90,  location: "Franciscan", insurance: "Aetna" },
+    { day: 0, hour: 7,    doctorId: 23, procLabel: "Spinal Fusion (1-level)",    patient: "J. Ford",     duration: 180, location: "Surgicare",  insurance: "Anthem" },
+    { day: 1, hour: 7,    doctorId: 22, procLabel: "Disc Replacement",           patient: "G. Adams",    duration: 180, location: "Franciscan", insurance: "Cigna" },
+    { day: 1, hour: 10,   doctorId: 18, procLabel: "Epidural Steroid Injection", patient: "T. Donovan",  duration: 30,  location: "Franciscan", insurance: "Cigna" },
+    { day: 1, hour: 8,    doctorId: 11, procLabel: "Shoulder Arthroscopy",       patient: "M. Ross",     duration: 90,  location: "Surgicare",  insurance: "United Healthcare" },
+    { day: 2, hour: 7,    doctorId: 16, procLabel: "Microdiscectomy",            patient: "S. Petrov",   duration: 90,  location: "Surgicare",  insurance: "United Healthcare" },
+    { day: 2, hour: 8.5,  doctorId: 16, procLabel: "Kyphoplasty",                patient: "B. Cole",     duration: 60,  location: "Franciscan", insurance: "Humana" },
+    { day: 3, hour: 7,    doctorId: 20, procLabel: "Radiofrequency Ablation",    patient: "L. Garcia",   duration: 45,  location: "Franciscan", insurance: "Aetna Medicare" },
+    { day: 3, hour: 8,    doctorId: 11, procLabel: "Shoulder Arthroscopy",       patient: "A. Webb",     duration: 90,  location: "Surgicare",  insurance: "Work Comp" },
+    { day: 4, hour: 7,    doctorId: 14, procLabel: "Carpal Tunnel Release",      patient: "K. Patel",    duration: 30,  location: "Franciscan", insurance: "Medicare" }
+  ];
+  samples.forEach(s => {
+    const doc = DOCTORS.find(d => d.id === s.doctorId);
+    const date = new Date(monday); date.setDate(monday.getDate() + s.day);
+    APPOINTMENTS.push({
+      id: "seed-"+Math.random().toString(36).slice(2,8),
+      doctorId: s.doctorId, doctorName: doc.name,
+      patient: s.patient, procedure: s.procLabel,
+      location: s.location, insurance: s.insurance,
+      setting: "outpatient", roomFlip: false,
+      date: date.toISOString().slice(0,10),
+      hour: s.hour, duration: s.duration, seeded: true
+    });
+  });
+}
+
+function goto(page){
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  document.querySelectorAll('aside nav a').forEach(a => a.classList.remove('active'));
+  document.querySelector(`aside nav a[data-page="${page}"]`).classList.add('active');
+  if (page === 'submission') resetForm();
+  if (page === 'schedule')   renderCalendar();
+  if (page === 'patients')   renderPatients();
+  if (page === 'procedures') renderProcedures();
+  if (page === 'doctors')    renderDoctors();
+}
+
+document.querySelectorAll('.pill-group').forEach(group => {
+  group.addEventListener('click', e => {
+    const pill = e.target.closest('.pill');
+    if (!pill) return;
+    group.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+    pill.classList.add('active');
+  });
+});
+function getPill(id){ const el = document.querySelector(`#${id} .pill.active`); return el ? el.dataset.val : null; }
+function cap(s){ return s ? s[0].toUpperCase() + s.slice(1) : s; }
+function shortDoctorName(name){ return name.replace(/^Dr\. /, 'Dr. ').replace(/, (MD|DO|DPM|PhD,? HSPP|PhD,? MS|MD,? MS|PhD)/, ''); }
+function hourToTimeStr(h){ const t=Math.round(h*60); return `${String(Math.floor(t/60)).padStart(2,'0')}:${String(t%60).padStart(2,'0')}`; }
+function timeStrToHour(s){ if(!s)return null; const [hh,mm]=s.split(':').map(Number); return hh+mm/60; }
+function formatTime12(h){ const t=Math.round(h*60); const hh=Math.floor(t/60); const mm=t%60; const am=hh<12; const h12=hh>12?hh-12:(hh===0?12:hh); return `${h12}:${String(mm).padStart(2,'0')} ${am?'AM':'PM'}`; }
+
+function populateDoctorSelect(){
+  const sel = document.getElementById('doctorSelect');
+  const sorted = [...DOCTORS].sort((a,b) => a.name.localeCompare(b.name));
+  sel.innerHTML = '<option value="">— Select Doctor —</option>' + sorted.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+  updateProcedureOptions();
+}
+function updateProcedureOptions(){
+  const doctorIdVal = document.getElementById('doctorSelect').value;
+  const sel = document.getElementById('procedureSelect');
+  if (!doctorIdVal) { sel.innerHTML = `<option value="">— Select a doctor first —</option>`; return; }
+  const doctorId = parseInt(doctorIdVal);
+  const procs = PROCEDURES.filter(p => p.doctorIds.includes(doctorId)).sort((a,b) => a.name.localeCompare(b.name));
+  sel.innerHTML = procs.length === 0
+    ? `<option value="">— No procedures assigned to this doctor —</option>`
+    : '<option value="">— Select Procedure —</option>' + procs.map(p => `<option value="${p.id}">${p.name} (${p.duration} min)</option>`).join('');
+}
+
+function locationFromInsurance(insurance){ return (INSURANCE_TO_LOC[insurance] || ["Franciscan"])[0]; }
+
+function findChronologicalSlot(doctor, date, durationMin, location){
+  const dayIdx = date.getDay();
+  if (dayIdx === 0 || dayIdx === 6) return null;
+  const dayName = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][dayIdx];
+  const hours = doctor.schedule[dayName];
+  if (!hours || !doctor.enabledDays.has(dayName)) return null;
+  const dateStr = date.toISOString().slice(0,10);
+  if (doctor.timeOff.some(t => dateStr >= t.start && dateStr <= t.end)) return null;
+  const dayStart = Math.max(hours.start, DAY_START);
+  const dayEnd   = Math.min(hours.end, DAY_END);
+  const durHours = durationMin / 60;
+  const existing = APPOINTMENTS
+    .filter(a => a.doctorId === doctor.id && a.date === dateStr && a.location === location)
+    .sort((a,b) => a.hour - b.hour);
+  const cands = [dayStart];
+  existing.forEach(a => cands.push(a.hour + a.duration/60));
+  for (const s of cands) {
+    if (s < dayStart) continue;
+    if (s + durHours > dayEnd) continue;
+    if (!existing.some(a => { const aEnd = a.hour + a.duration/60; return s < aEnd && s + durHours > a.hour; })) return s;
+  }
+  return null;
+}
+
+function runMatch(){
+  const doctorId = parseInt(document.getElementById('doctorSelect').value);
+  const procedureId = parseInt(document.getElementById('procedureSelect').value);
+  const doctor = DOCTORS.find(d => d.id === doctorId);
+  const procedure = PROCEDURES.find(p => p.id === procedureId);
+  if (!doctor)    { showToast('Select a doctor'); return; }
+  if (!procedure) { showToast('Select a procedure'); return; }
+  const input = {
+    firstName: document.getElementById('firstName').value,
+    lastName:  document.getElementById('lastName').value,
+    dob:       document.getElementById('dob').value,
+    insurance: document.getElementById('insurance').value,
+    setting:   getPill('setting'),
+    roomFlip:  getPill('roomFlip') === 'yes',
+    notes:     document.getElementById('notes').value,
+    preferredDate: document.getElementById('preferredDate').value
+  };
+  if (!input.insurance) { showToast('Select an insurance'); return; }
+  const adjustedDuration = Math.max(15, procedure.duration - (input.roomFlip ? 15 : 0));
+  const location = locationFromInsurance(input.insurance);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const baseDate = input.preferredDate ? new Date(input.preferredDate + 'T00:00:00') : new Date(today.getTime() + 86400000);
+  const startDate = baseDate < today ? new Date(today.getTime() + 86400000) : baseDate;
+  let slot = null;
+  for (let offset = 0; offset <= 90; offset++){
+    const d = new Date(startDate); d.setDate(startDate.getDate() + offset);
+    const start = findChronologicalSlot(doctor, d, adjustedDuration, location);
+    if (start !== null) { slot = { date: d, hour: start }; break; }
+  }
+  renderResult(doctor, procedure, slot, location, adjustedDuration, input);
+}
+
+function renderResult(doctor, procedure, slot, location, adjustedDuration, input){
+  const c = document.getElementById('results');
+  if (!slot){
+    pendingMatch = null;
+    c.innerHTML = `<div class="empty"><strong>No available slot found.</strong><br/><br/>${doctor.name} has no open chronological window for ${procedure.name} (${adjustedDuration} min) within 7 AM – 3:30 PM at ${location} in the next 90 days from the preferred date.</div>`;
+    return;
+  }
+  pendingMatch = { doctor, procedure, slot, location, adjustedDuration, input };
+  const dateStr = slot.date.toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric', year:'numeric' });
+  const startStr = formatTime12(slot.hour);
+  const endStr   = formatTime12(slot.hour + adjustedDuration/60);
+  c.innerHTML = `
+    <div class="recommendation">
+      <div class="result-headline"><span class="loc-tag-lg" style="background:${LOC_COLOR[location]}">${location}</span></div>
+      <div class="result-grid">
+        <div class="ritem"><div class="label">Date</div><div class="value">${dateStr}</div></div>
+        <div class="ritem"><div class="label">Time</div><div class="value">${startStr}</div></div>
+        <div class="ritem"><div class="label">Duration</div><div class="value">${adjustedDuration} min${input.roomFlip ? ' *' : ''}</div></div>
+      </div>
+      <div class="result-meta">
+        <div><strong>Doctor</strong>${doctor.name}</div>
+        <div><strong>Procedure</strong>${procedure.name}</div>
+        <div><strong>Ends</strong>${endStr}</div>
+        <div><strong>Setting</strong>${cap(input.setting)}</div>
+        <div><strong>Room Flip</strong>${input.roomFlip ? 'Yes (−15 min)' : 'No'}</div>
+        <div><strong>Insurance</strong>${input.insurance}</div>
+        <div><strong>Patient</strong>${input.firstName} ${input.lastName}</div>
+      </div>
+      <button class="confirm" onclick="confirmAppointment()">Confirm Appointment</button>
+    </div>`;
+}
+
+function confirmAppointment(){
+  if (!pendingMatch) return;
+  const { doctor, procedure, slot, location, adjustedDuration, input } = pendingMatch;
+  const apptId = "appt-" + Date.now();
+  const patientId = "p-" + Date.now();
+  PATIENTS.push({ id: patientId, firstName: input.firstName, lastName: input.lastName, dob: input.dob, insurance: input.insurance, notes: input.notes, appointments: [apptId] });
+  APPOINTMENTS.push({
+    id: apptId, patientId, patient: input.firstName + " " + input.lastName,
+    doctorId: doctor.id, doctorName: doctor.name,
+    procedure: procedure.name, procedureId: procedure.id,
+    setting: input.setting, roomFlip: input.roomFlip, insurance: input.insurance, location,
+    date: slot.date.toISOString().slice(0,10), hour: slot.hour, duration: adjustedDuration
+  });
+  showToast(`Confirmed: ${input.firstName} ${input.lastName} with ${doctor.name}`);
+  pendingMatch = null;
+  currentWeekStart = mondayOf(slot.date);
+  goto('schedule');
+}
+
+function resetForm(){
+  ['firstName','lastName','dob','notes','preferredDate'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('insurance').value = '';
+  document.getElementById('doctorSelect').value = '';
+  updateProcedureOptions();
+  document.getElementById('results').innerHTML = `<div class="empty">Pick a doctor and procedure, then click <strong>Schedule</strong> to see the recommended location, date, and time.</div>`;
+  pendingMatch = null;
+}
+
+function mondayOf(d){
+  const x = new Date(d); x.setHours(0,0,0,0);
+  const day = x.getDay(); const diff = (day === 0 ? -6 : 1 - day);
+  x.setDate(x.getDate() + diff); return x;
+}
+function shiftWeek(delta){ const x=new Date(currentWeekStart); x.setDate(x.getDate()+delta*7); currentWeekStart=x; renderCalendar(); }
+function goToThisWeek(){ currentWeekStart = mondayOf(new Date()); renderCalendar(); }
+
+function renderCalendar(){
+  const ws = new Date(currentWeekStart);
+  const we = new Date(currentWeekStart); we.setDate(ws.getDate()+4);
+  document.getElementById('weekLabel').textContent =
+    ws.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + " — " +
+    we.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  renderLocationCalendar("Surgicare",  "calendar-Surgicare");
+  renderLocationCalendar("Franciscan", "calendar-Franciscan");
+}
+
+function renderLocationCalendar(location, containerId){
+  const cal = document.getElementById(containerId);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const HOURS = [7,8,9,10,11,12,13,14,15];
+  const DAYS = ["Mon","Tue","Wed","Thu","Fri"];
+  const ws = new Date(currentWeekStart);
+  let html = '<div class="cal-cell cal-head" style="background:white;border-bottom:1px solid var(--border)"></div>';
+  DAYS.forEach((d, i) => {
+    const date = new Date(currentWeekStart); date.setDate(ws.getDate()+i);
+    const isToday = date.getTime() === today.getTime();
+    html += `<div class="cal-cell cal-head ${isToday?'today':''}">${d}<span class="date">${date.toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span></div>`;
+  });
+  HOURS.forEach(h => {
+    html += `<div class="cal-cell cal-time">${formatTime12(h)}</div>`;
+    DAYS.forEach((_, i) => {
+      const lastClass = i === 4 ? 'day-fri' : '';
+      html += `<div class="cal-cell ${lastClass}" data-day="${i}" data-hour="${h}"></div>`;
+    });
+  });
+  cal.innerHTML = html;
+  const myAppts = APPOINTMENTS.filter(a => a.location === location);
+  myAppts.forEach(a => {
+    const apptDate = new Date(a.date + "T00:00:00");
+    const diff = Math.round((apptDate - currentWeekStart) / 86400000);
+    if (diff < 0 || diff > 4) return;
+    if (a.hour < 7 || a.hour > 15.5) return;
+    const cellHour = Math.floor(a.hour);
+    const cell = cal.querySelector(`.cal-cell[data-day="${diff}"][data-hour="${cellHour}"]`);
+    if (!cell) return;
+    const minuteOffset = (a.hour - cellHour) * 40;
+    const heightHours = a.duration / 60;
+    const calcHeight = heightHours * 40 - 4;
+    const div = document.createElement('div');
+    div.className = 'appt';
+    div.style.background = LOC_COLOR[a.location] || '#64748b';
+    div.style.height = Math.max(calcHeight, 22) + 'px';
+    div.style.top = (2 + minuteOffset) + 'px';
+    div.title = 'Click to edit';
+    div.innerHTML = `<span class="pt">${a.patient}</span><span class="proc">${a.procedure}</span><span class="doc">${shortDoctorName(a.doctorName)}</span>`;
+    div.onclick = () => openAppointmentEditor(a.id);
+    cell.appendChild(div);
+  });
+  const countEl = document.getElementById('count-' + location);
+  if (countEl) {
+    const weekEnd = new Date(currentWeekStart); weekEnd.setDate(ws.getDate() + 5);
+    const wkCount = myAppts.filter(a => { const ad = new Date(a.date + "T00:00:00"); return ad >= currentWeekStart && ad < weekEnd; }).length;
+    countEl.textContent = wkCount + (wkCount === 1 ? ' appt' : ' appts');
+  }
+}
+
+function openAppointmentEditor(apptId){
+  const isNew = !apptId;
+  const a = isNew ? null : APPOINTMENTS.find(x => x.id === apptId);
+  const patient = (a && a.patientId) ? PATIENTS.find(p => p.id === a.patientId) : null;
+  const firstName = patient?.firstName ?? (a ? (a.patient || '').split(' ')[0] || '' : '');
+  const lastName  = patient?.lastName  ?? (a ? (a.patient || '').split(' ').slice(1).join(' ') : '');
+  const dob       = patient?.dob       ?? '';
+  const insurance = (a?.insurance) ?? (patient?.insurance ?? 'Medicare');
+  const doctorId  = a?.doctorId ?? DOCTORS[0].id;
+  const procedureName = a?.procedure ?? '';
+  const date = a?.date ?? '';
+  const hour = a?.hour ?? 7;
+  const duration = a?.duration ?? 60;
+  const location = a?.location ?? 'Franciscan';
+  const setting = a?.setting ?? 'outpatient';
+  const roomFlip = !!(a?.roomFlip);
+  const notes = patient?.notes ?? '';
+  const doctorOptions = [...DOCTORS].sort((x,y) => x.name.localeCompare(y.name))
+    .map(d => `<option value="${d.id}" ${d.id === doctorId ? 'selected' : ''}>${d.name}</option>`).join('');
+  const apptIdArg = a ? `'${a.id}'` : 'null';
+
+  document.getElementById('modalBody').innerHTML = `
+    <h3>${isNew ? 'New Appointment' : 'Edit Appointment'}</h3>
+    <label>Doctor</label>
+    <select id="ed_doctor" onchange="updateEditProcedureOptions(${apptIdArg})">${doctorOptions}</select>
+    <label>Procedure</label>
+    <select id="ed_procedure"></select>
+    <div class="row">
+      <div><label>Date</label><input id="ed_date" type="date" value="${date}" /></div>
+      <div><label>Time</label><input id="ed_time" type="time" min="07:00" max="15:30" value="${hourToTimeStr(hour)}" /></div>
+    </div>
+    <div class="row">
+      <div><label>First Name</label><input id="ed_firstName" type="text" value="${escapeAttr(firstName)}" /></div>
+      <div><label>Last Name</label><input id="ed_lastName" type="text" value="${escapeAttr(lastName)}" /></div>
+    </div>
+    <div class="row">
+      <div><label>Date of Birth</label><input id="ed_dob" type="date" value="${dob}" /></div>
+      <div><label>Duration (min)</label><input id="ed_duration" type="number" min="15" step="15" value="${duration}" /></div>
+    </div>
+    <label>Insurance</label>
+    <select id="ed_insurance">${INSURANCES.map(i => `<option ${i === insurance ? 'selected' : ''}>${i}</option>`).join('')}</select>
+    <label>Location</label>
+    <select id="ed_location">${LOCATIONS.map(l => `<option ${l === location ? 'selected' : ''}>${l}</option>`).join('')}</select>
+    <label>Inpatient vs Outpatient</label>
+    <div class="pill-group" id="ed_setting">
+      <div class="pill ${setting === 'outpatient' ? 'active' : ''}" data-val="outpatient">Outpatient</div>
+      <div class="pill ${setting === 'inpatient' ? 'active' : ''}" data-val="inpatient">Inpatient</div>
+    </div>
+    <label>Room Flip</label>
+    <div class="pill-group" id="ed_roomFlip">
+      <div class="pill ${!roomFlip ? 'active' : ''}" data-val="no">No</div>
+      <div class="pill ${roomFlip ? 'active' : ''}" data-val="yes">Yes</div>
+    </div>
+    <label>Notes</label>
+    <textarea id="ed_notes" rows="2">${escapeAttr(notes)}</textarea>
+    <button class="primary" onclick="saveAppointment(${isNew ? 'null' : `'${a.id}'`})">${isNew ? 'Create Appointment' : 'Save Changes'}</button>
+    ${isNew ? '' : `<button class="danger-btn" onclick="cancelEvent('${a.id}')">Cancel Event</button>`}
+    <button class="secondary" onclick="closeModal()">Close</button>
+  `;
+  document.querySelectorAll('#ed_setting .pill').forEach(p => {
+    p.onclick = () => { const g=p.parentElement; g.querySelectorAll('.pill').forEach(x=>x.classList.remove('active')); p.classList.add('active'); };
+  });
+  document.querySelectorAll('#ed_roomFlip .pill').forEach(p => {
+    p.onclick = () => {
+      const wasYes = document.querySelector('#ed_roomFlip .pill.active')?.dataset.val === 'yes';
+      const g=p.parentElement; g.querySelectorAll('.pill').forEach(x=>x.classList.remove('active')); p.classList.add('active');
+      const nowYes = p.dataset.val === 'yes';
+      if (wasYes !== nowYes) {
+        const durEl = document.getElementById('ed_duration');
+        const cur = parseInt(durEl.value) || 0;
+        durEl.value = nowYes ? Math.max(15, cur - 15) : cur + 15;
+      }
+    };
+  });
+  document.getElementById('ed_procedure').addEventListener('change', () => {
+    const procId = parseInt(document.getElementById('ed_procedure').value);
+    const proc = PROCEDURES.find(p => p.id === procId);
+    if (!proc) return;
+    const roomFlipYes = document.querySelector('#ed_roomFlip .pill.active')?.dataset.val === 'yes';
+    document.getElementById('ed_duration').value = Math.max(15, proc.duration - (roomFlipYes ? 15 : 0));
+  });
+  updateEditProcedureOptions(a ? a.id : null, procedureName);
+  let userTouchedLocation = false;
+  document.getElementById('ed_location').addEventListener('change', () => { userTouchedLocation = true; });
+  document.getElementById('ed_insurance').addEventListener('change', () => {
+    if (userTouchedLocation) return;
+    document.getElementById('ed_location').value = locationFromInsurance(document.getElementById('ed_insurance').value);
+  });
+  document.getElementById('modalOverlay').classList.add('show');
+}
+
+function updateEditProcedureOptions(apptId, preselectName){
+  const doctorId = parseInt(document.getElementById('ed_doctor').value);
+  const procs = PROCEDURES.filter(p => p.doctorIds.includes(doctorId)).sort((a,b) => a.name.localeCompare(b.name));
+  const sel = document.getElementById('ed_procedure');
+  const current = preselectName || (apptId ? APPOINTMENTS.find(a => a.id === apptId)?.procedure : null);
+  sel.innerHTML = procs.length === 0
+    ? `<option value="">— No procedures for this doctor —</option>`
+    : procs.map(p => `<option value="${p.id}" ${p.name === current ? 'selected' : ''}>${p.name} (${p.duration} min)</option>`).join('');
+}
+
+function escapeAttr(s){ return String(s ?? '').replace(/"/g, '&quot;'); }
+
+function saveAppointment(apptId){
+  const isNew = apptId === null;
+  const doctorId = parseInt(document.getElementById('ed_doctor').value);
+  const procId = parseInt(document.getElementById('ed_procedure').value);
+  const doctor = DOCTORS.find(d => d.id === doctorId);
+  const procedure = PROCEDURES.find(p => p.id === procId);
+  const date = document.getElementById('ed_date').value;
+  const time = document.getElementById('ed_time').value;
+  const duration = parseInt(document.getElementById('ed_duration').value) || 60;
+  const insurance = document.getElementById('ed_insurance').value;
+  const location = document.getElementById('ed_location').value;
+  const firstName = document.getElementById('ed_firstName').value.trim();
+  const lastName  = document.getElementById('ed_lastName').value.trim();
+  const dob = document.getElementById('ed_dob').value;
+  const notes = document.getElementById('ed_notes').value;
+  const setting = document.querySelector('#ed_setting .pill.active')?.dataset.val || 'outpatient';
+  const roomFlip = document.querySelector('#ed_roomFlip .pill.active')?.dataset.val === 'yes';
+  if (!date)     { showToast('Pick a date'); return; }
+  if (!time)     { showToast('Pick a time'); return; }
+  if (!doctor)   { showToast('Pick a doctor'); return; }
+  if (!procedure){ showToast('Pick a procedure'); return; }
+  const hour = timeStrToHour(time);
+  if (hour < DAY_START || hour + duration/60 > DAY_END) { showToast(`Time must be within 7:00 AM – 3:30 PM`); return; }
+  if (isNew) {
+    const newApptId = "appt-" + Date.now();
+    const patientId = "p-" + Date.now();
+    PATIENTS.push({ id: patientId, firstName, lastName, dob, insurance, notes, appointments: [newApptId] });
+    APPOINTMENTS.push({
+      id: newApptId, patientId, patient: firstName + " " + lastName,
+      doctorId: doctor.id, doctorName: doctor.name,
+      procedure: procedure.name, procedureId: procedure.id,
+      setting, roomFlip, insurance, location, date, hour, duration
+    });
+    showToast(`Created appointment for ${firstName} ${lastName}`);
+  } else {
+    const appt = APPOINTMENTS.find(a => a.id === apptId);
+    if (!appt) return;
+    Object.assign(appt, {
+      doctorId: doctor.id, doctorName: doctor.name,
+      procedure: procedure.name, procedureId: procedure.id,
+      setting, roomFlip, insurance, location, date, hour, duration,
+      patient: firstName + " " + lastName
+    });
+    if (appt.patientId) {
+      const p = PATIENTS.find(pp => pp.id === appt.patientId);
+      if (p) Object.assign(p, { firstName, lastName, dob, insurance, notes });
+    }
+    showToast(`Updated appointment for ${firstName} ${lastName}`);
+  }
+  closeModal();
+}
+
+function cancelEvent(apptId){
+  const appt = APPOINTMENTS.find(a => a.id === apptId);
+  if (!appt) return;
+  if (!confirm(`Cancel ${appt.patient}'s ${appt.procedure} on ${appt.date}?`)) return;
+  const idx = APPOINTMENTS.findIndex(a => a.id === apptId);
+  if (idx >= 0) APPOINTMENTS.splice(idx, 1);
+  showToast(`Cancelled appointment`);
+  closeModal();
+}
+
+function closeModal(){
+  document.getElementById('modalOverlay').classList.remove('show');
+  if (document.getElementById('page-doctors').classList.contains('active'))    renderDoctors();
+  if (document.getElementById('page-procedures').classList.contains('active')) renderProcedures();
+  if (document.getElementById('page-submission').classList.contains('active')) updateProcedureOptions();
+  if (document.getElementById('page-schedule').classList.contains('active'))   renderCalendar();
+  if (document.getElementById('page-patients').classList.contains('active'))   renderPatients();
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+function renderPatients(){
+  const c = document.getElementById('patientsContainer');
+  document.getElementById('patientCount').textContent = `(${PATIENTS.length} on file)`;
+  if (PATIENTS.length === 0) { c.innerHTML = `<div class="card empty">No patients yet. Submit &amp; confirm an appointment to add one.</div>`; return; }
+  let rows = '';
+  PATIENTS.forEach(p => {
+    const appts = APPOINTMENTS.filter(a => a.patientId === p.id);
+    const next = appts[0];
+    const age = p.dob ? Math.floor((Date.now() - new Date(p.dob)) / 31557600000) : '—';
+    rows += `
+      <tr>
+        <td><strong>${p.firstName} ${p.lastName}</strong></td>
+        <td>${p.dob || '—'}<div style="color:var(--muted);font-size:11px">${age !== '—' ? age + ' yrs' : ''}</div></td>
+        <td>${p.insurance}</td>
+        <td>${next ? `${next.procedure}<div style="color:var(--muted);font-size:11px">${next.doctorName}</div>` : '—'}</td>
+        <td>${next ? `<span class="loc-dot" style="background:${LOC_COLOR[next.location]}"></span>${next.location}<div style="color:var(--muted);font-size:11px">${new Date(next.date).toLocaleDateString('en-US',{month:'short',day:'numeric'})} at ${formatTime12(next.hour)}</div>` : '—'}</td>
+        <td>${p.notes || '—'}</td>
+      </tr>`;
+  });
+  c.innerHTML = `<table><thead><tr><th>Patient</th><th>DOB / Age</th><th>Insurance</th><th>Next Procedure</th><th>Next Appt</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function renderProcedures(){
+  const c = document.getElementById('proceduresContainer');
+  if (PROCEDURES.length === 0) { c.innerHTML = `<div class="card empty">No procedures yet. Click <strong>+ Add Procedure</strong> to create one.</div>`; return; }
+  let rows = '';
+  [...PROCEDURES].sort((a,b) => a.name.localeCompare(b.name)).forEach(p => {
+    const docNames = p.doctorIds.map(id => { const d = DOCTORS.find(x => x.id === id); return d ? shortDoctorName(d.name) : null; }).filter(Boolean);
+    const docHtml = docNames.length ? docNames.map(n => `<span class="proc-tag">${n}</span>`).join('') : '<em style="color:#cbd5e1">No doctors assigned</em>';
+    const kindBadge = p.kind === 'OR' ? '<span class="badge-pill surg">Surgery</span>' : '<span class="badge-pill inj">Clinic</span>';
+    rows += `<tr><td><strong>${p.name}</strong><div style="margin-top:4px">${kindBadge}</div></td><td>${p.duration} min</td><td>${docHtml}</td><td><button class="manage-btn" onclick="openProcedureModal(${p.id})">Edit</button></td></tr>`;
+  });
+  c.innerHTML = `<table><thead><tr><th>Procedure</th><th>Duration</th><th>Doctors</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function openProcedureModal(procId){
+  const isNew = procId === null || procId === undefined;
+  const p = isNew ? { id: null, name: "", duration: 60, kind: "OR", doctorIds: [] } : PROCEDURES.find(pp => pp.id === procId);
+  if (!p) return;
+  const doctorChecks = [...DOCTORS].sort((a,b) => a.name.localeCompare(b.name)).map(d => `
+    <label><input type="checkbox" data-doctor-id="${d.id}" ${p.doctorIds.includes(d.id) ? 'checked' : ''}> ${d.name}</label>
+  `).join('');
+  document.getElementById('modalBody').innerHTML = `
+    <h3>${isNew ? 'Add Procedure' : 'Edit Procedure'}</h3>
+    <label>Procedure Name</label>
+    <input id="procName" value="${escapeAttr(p.name)}" placeholder="e.g., Microdiscectomy" />
+    <div class="row">
+      <div><label>Approx. Duration (min)</label><input id="procDuration" type="number" value="${p.duration}" min="15" step="15" /></div>
+      <div><label>Type</label>
+        <select id="procKind">
+          <option value="OR" ${p.kind === 'OR' ? 'selected' : ''}>Surgery (OR)</option>
+          <option value="clinic" ${p.kind === 'clinic' ? 'selected' : ''}>Clinic / In-office</option>
+        </select>
+      </div>
+    </div>
+    <label>Doctors who perform this procedure</label>
+    <div class="check-list" id="procDoctorList">${doctorChecks}</div>
+    <button class="primary" onclick="saveProcedure(${isNew ? 'null' : p.id})">${isNew ? 'Create Procedure' : 'Save Changes'}</button>
+    ${isNew ? '' : `<button class="danger-btn" onclick="deleteProcedure(${p.id})">Delete Procedure</button>`}
+    <button class="secondary" onclick="closeModal()">Cancel</button>
+  `;
+  document.getElementById('modalOverlay').classList.add('show');
+}
+
+function saveProcedure(procId){
+  const name = document.getElementById('procName').value.trim();
+  const duration = parseInt(document.getElementById('procDuration').value) || 60;
+  const kind = document.getElementById('procKind').value;
+  const doctorIds = [...document.querySelectorAll('#procDoctorList input:checked')].map(el => parseInt(el.dataset.doctorId));
+  if (!name) { showToast('Procedure needs a name'); return; }
+  if (procId === null) { PROCEDURES.push({ id: nextProcId++, name, duration, kind, doctorIds }); showToast(`Added: ${name}`); }
+  else { Object.assign(PROCEDURES.find(pp => pp.id === procId), { name, duration, kind, doctorIds }); showToast(`Updated: ${name}`); }
+  closeModal();
+}
+
+function deleteProcedure(procId){
+  const p = PROCEDURES.find(pp => pp.id === procId);
+  if (!p) return;
+  if (!confirm(`Delete "${p.name}"?`)) return;
+  PROCEDURES.splice(PROCEDURES.findIndex(pp => pp.id === procId), 1);
+  showToast(`Deleted: ${p.name}`);
+  closeModal();
+}
+
+function renderDoctors(){
+  const c = document.getElementById('doctorsContainer');
+  const today = new Date().toISOString().slice(0,10);
+  let rows = '';
+  DOCTORS.forEach(d => {
+    const setting = d.settings.length === 2 ? 'In + Outpatient' : cap(d.settings[0]);
+    const days = ['Mon','Tue','Wed','Thu','Fri'];
+    const dayHtml = days.map(day => {
+      const enabled = d.enabledDays.has(day);
+      const s = d.schedule[day];
+      const hoursStr = enabled && s ? `${formatTime12(s.start)} – ${formatTime12(s.end)}` : '<em>Off</em>';
+      return `<div class="day-row${enabled ? '' : ' off'}" style="font-size:11px;color:var(--muted)"><strong style="color:${enabled ? 'var(--ink)' : 'var(--muted)'};display:inline-block;width:30px">${day}</strong>${hoursStr}</div>`;
+    }).join('');
+    const upcomingTO = d.timeOff.filter(t => t.end >= today);
+    const timeOffPill = upcomingTO.length ? `<div class="timeoff-tag">⚠ ${upcomingTO.length} time-off period${upcomingTO.length === 1 ? '' : 's'} scheduled</div>` : '';
+    const docProcs = PROCEDURES.filter(p => p.doctorIds.includes(d.id)).sort((a,b) => a.name.localeCompare(b.name));
+    const specialtyHtml = docProcs.length === 0 ? '<em style="color:#cbd5e1;font-size:12px">No procedures assigned</em>' : docProcs.map(p => `<span class="proc-tag">${p.name}</span>`).join('');
+    let typeBadge;
+    if (d.type === 'surgery') typeBadge = '<span class="badge-pill surg">Surgery</span>';
+    else if (d.type === 'injection') typeBadge = '<span class="badge-pill inj">Pain Mgmt</span>';
+    else typeBadge = '<span class="badge-pill both">Non-Op</span>';
+    const titleHtml = d.title ? `<div style="color:var(--muted);font-size:11px;margin-top:2px">${d.title}</div>` : '';
+    rows += `
+      <tr>
+        <td><strong>${d.name}</strong>${titleHtml}<div style="color:var(--muted);font-size:11px;margin-top:6px">${d.email}<br/>${d.phone}</div></td>
+        <td>${typeBadge}<div style="margin-top:6px;font-size:12px">${setting}</div></td>
+        <td style="min-width:170px">${dayHtml}${timeOffPill}</td>
+        <td>${specialtyHtml}</td>
+        <td><button class="manage-btn" onclick="openAvailabilityModal(${d.id})">Manage</button></td>
+      </tr>`;
+  });
+  c.innerHTML = `<table><thead><tr><th>Doctor</th><th>Type / Setting</th><th>Availability</th><th>Specialty</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function openAvailabilityModal(doctorId){
+  const doc = DOCTORS.find(d => d.id === doctorId);
+  if (!doc) return;
+  renderAvailabilityModal(doc);
+  document.getElementById('modalOverlay').classList.add('show');
+}
+
+function renderAvailabilityModal(doc){
+  const days = ['Mon','Tue','Wed','Thu','Fri'];
+  const dayRows = days.map(day => {
+    const enabled = doc.enabledDays.has(day);
+    const s = doc.schedule[day] || { start: 7, end: 15.5 };
+    return `
+      <div class="day-row-edit ${enabled ? '' : 'off'}" data-day="${day}">
+        <input type="checkbox" ${enabled ? 'checked' : ''} onchange="toggleDay(${doc.id}, '${day}')">
+        <div class="day-name">${day}</div>
+        <input type="time" id="hr_${day}_start" min="07:00" max="15:30" value="${hourToTimeStr(s.start)}" ${enabled ? '' : 'disabled'} onchange="updateDayHours(${doc.id}, '${day}')">
+        <div class="dash">–</div>
+        <input type="time" id="hr_${day}_end"   min="07:00" max="15:30" value="${hourToTimeStr(s.end)}"   ${enabled ? '' : 'disabled'} onchange="updateDayHours(${doc.id}, '${day}')">
+      </div>`;
+  }).join('');
+  const sortedTimeOff = [...doc.timeOff].sort((a,b) => a.start.localeCompare(b.start));
+  const timeOffList = sortedTimeOff.length === 0
+    ? `<div style="color:var(--muted);font-size:13px;padding:6px 0 4px">No time off scheduled.</div>`
+    : sortedTimeOff.map(t => {
+        const realIdx = doc.timeOff.indexOf(t);
+        return `<div class="time-off-item">
+          <div><strong>${formatDateRange(t.start, t.end)}</strong>${t.reason ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">${t.reason}</div>` : ''}</div>
+          <button class="remove-btn" onclick="removeTimeOff(${doc.id}, ${realIdx})">×</button>
+        </div>`;
+      }).join('');
+  document.getElementById('modalBody').innerHTML = `
+    <h3>Manage Availability</h3>
+    <div style="color:var(--muted);font-size:13px;margin-bottom:4px;margin-top:-10px">${doc.name}</div>
+    <div class="section-title">Working Hours</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Hours range from 7:00 AM to 3:30 PM. Uncheck a day to mark the doctor off.</div>
+    <div>${dayRows}</div>
+    <div class="section-title">Time Off</div>
+    <div class="time-off-list">${timeOffList}</div>
+    <div class="time-off-form">
+      <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:8px">Add Time Off</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <input type="date" id="toStart" /><input type="date" id="toEnd" />
+      </div>
+      <input type="text" id="toReason" placeholder="Reason (optional)" />
+      <button class="add-btn" onclick="addTimeOff(${doc.id})">+ Add Time Off</button>
+    </div>
+    <button class="primary" style="margin-top:18px" onclick="closeModal()">Done</button>
+  `;
+}
+function toggleDay(doctorId, day){
+  const doc = DOCTORS.find(d => d.id === doctorId);
+  if (doc.enabledDays.has(day)) doc.enabledDays.delete(day); else doc.enabledDays.add(day);
+  renderAvailabilityModal(doc);
+}
+function updateDayHours(doctorId, day){
+  const doc = DOCTORS.find(d => d.id === doctorId);
+  const start = timeStrToHour(document.getElementById(`hr_${day}_start`).value);
+  const end   = timeStrToHour(document.getElementById(`hr_${day}_end`).value);
+  if (start === null || end === null) return;
+  if (start < DAY_START) { showToast(`Start time can't be earlier than 7:00 AM`); document.getElementById(`hr_${day}_start`).value = hourToTimeStr(DAY_START); return; }
+  if (end > DAY_END) { showToast(`End time can't be later than 3:30 PM`); document.getElementById(`hr_${day}_end`).value = hourToTimeStr(DAY_END); return; }
+  if (start >= end) { showToast('Start must be earlier than end'); return; }
+  doc.schedule[day] = { start, end };
+}
+function addTimeOff(doctorId){
+  const doc = DOCTORS.find(d => d.id === doctorId);
+  const start = document.getElementById('toStart').value;
+  const end = document.getElementById('toEnd').value;
+  const reason = document.getElementById('toReason').value.trim();
+  if (!start || !end) { showToast('Pick both start and end'); return; }
+  if (start > end) { showToast('End must be ≥ start'); return; }
+  doc.timeOff.push({ start, end, reason });
+  renderAvailabilityModal(doc);
+}
+function removeTimeOff(doctorId, idx){
+  DOCTORS.find(d => d.id === doctorId).timeOff.splice(idx, 1);
+  renderAvailabilityModal(DOCTORS.find(d => d.id === doctorId));
+}
+function formatDateRange(start, end){
+  const s = new Date(start + 'T00:00:00'); const e = new Date(end + 'T00:00:00');
+  if (start === end) return s.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const sameYear = s.getFullYear() === e.getFullYear();
+  const sStr = s.toLocaleDateString('en-US', sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
+  return `${sStr} – ${e.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=> t.classList.remove('show'), 2800);
+}
+
+populateDoctorSelect();
+renderCalendar();
+</script>
+
+</body>
+</html>
